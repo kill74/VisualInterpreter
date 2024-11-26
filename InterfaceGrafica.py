@@ -55,11 +55,11 @@ def eventos_rato(event, x, y, flags, param):
             cv2.destroyAllWindows()
             exit()
 
-# Configurar janela e callback do mouse
+# Configurar janela e callback do rato
 cv2.namedWindow('Janela')
 cv2.setMouseCallback('Janela', eventos_rato)
 
-# Loop principal
+# Loop para o programa funcionar e para os filtros funcionarem também
 while True:
     # Criar a janela principal (área de câmera + área de botões)
     janela = np.zeros((altura, largura, 3), dtype=np.uint8)
@@ -96,7 +96,6 @@ while True:
     if key == 27:  # Pressionar ESC para sair
         break
 
-# Liberar recursos
 if cap is not None:
     cap.release()
 cv2.destroyAllWindows()
