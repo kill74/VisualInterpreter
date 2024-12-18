@@ -31,9 +31,9 @@ sepia = np.array([[0.272, 0.534, 0.131],
                   [0.393, 0.769, 0.189]])
 
 # Identificar Cara
-
-
-
+face_cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+#Identificar olhos
+eye_cascade = cv2.CascadeClassifier("haarcascade_eye.xml")
 
 
 
@@ -79,10 +79,10 @@ while True:
             # Redimensionar o frame para caber na área da câmera
             frame = cv2.resize(frame, (largura, altura_camara))
             if cinza_ativo:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #
                 frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
             if desfoque_ativo:
-                frame = cv2.GaussianBlur(frame, (15, 15), 0)
+                frame = cv2.GaussianBlur(frame, (15, 15), 0) #ira meter a camara com desfoque 
             if sepia_ativo:
                 frame = cv2.transform(frame, sepia)
                 frame = np.clip(frame, 0, 255).astype(np.uint8)
