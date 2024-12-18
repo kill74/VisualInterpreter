@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def desenhar_botao(imagem, texto, pos, cor_fundo=(0, 0, 0), cor_texto=(255, 255, 255)):
+def desenhar_botao(imagem, texto, pos, cor_fundo=(0, 0, 0), cor_texto=(255, 255, 255)): 
     """
     Função para desenhar um botão na imagem
     
@@ -14,7 +14,7 @@ def desenhar_botao(imagem, texto, pos, cor_fundo=(0, 0, 0), cor_texto=(255, 255,
     x, y, w, h = pos
     # Desenha o retângulo do botão
     cv2.rectangle(imagem, (x, y), (x + w, y + h), cor_fundo, -1)
-    
+
     # Configura a fonte
     fonte = cv2.FONT_HERSHEY_SIMPLEX
     
@@ -168,12 +168,12 @@ while True:
             janela[0:altura_camara, 0:largura] = frame
     
     # Desenhar botões na janela
-    desenhar_botao(janela, "Iniciar", botao_camara)
-    desenhar_botao(janela, "Blur", botao_blur)
-    desenhar_botao(janela, "Efeito Sepia", botao_EfeitoSepia)
-    desenhar_botao(janela, "Cinza", botao_cinza)
-    desenhar_botao(janela, "Detetar", botao_detetar)
-    desenhar_botao(janela, "X", botao_fechar)
+    desenhar_botao(janela, "Iniciar", botao_camara) #ira começar a câmara
+    desenhar_botao(janela, "Blur", botao_blur) # ira meter a câmara
+    desenhar_botao(janela, "Efeito Sepia", botao_EfeitoSepia) #ira meter o efeito sepia na câmara
+    desenhar_botao(janela, "Cinza", botao_cinza) # ira meter a câmara com o efeito de preto e branco
+    desenhar_botao(janela, "Detetar", botao_detetar) # ira detetar a cara e os olhos 
+    desenhar_botao(janela, "X", botao_fechar) #poderemos carregar no esc on no X para fechar a janela 
     
     # Exibir a janela principal
     cv2.imshow('Janela', janela)
