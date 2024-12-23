@@ -3,6 +3,7 @@ from tkinter import ttk, filedialog
 import cv2
 from PIL import Image, ImageTk
 import numpy as np
+import os
 
 # Carregar os classificadores para deteção de faces e olhos
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -18,6 +19,7 @@ cinza_ativo = False
 desfoque_ativo = False
 sepia_ativo = False
 segmentacao_ativa = False
+deteccao_ativa = False
 
 # Função para aplicar o filtro de sepia
 def aplicar_sepia(frame):
@@ -50,27 +52,43 @@ def segmentar_e_contar(frame):
     
     return frame, len(contours)
 
+# Função para detectar faces e olhos
+def detectar_olhos_e_cara(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    for (x, y, w, h) in faces:
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        roi_gray = gray[y:y+h, x:x+w]
+        roi_color = frame[y:y+h, x:x+w]
+        eyes = eye_cascade.detectMultiScale(roi_gray)
+        for (ex, ey, ew, eh) in eyes:
+            cv2.rectangle(roi_color, (ex, ey), (ex+ew, ey+eh), (0, 255, 0), 2)
+    return frame
+
 # Função para capturar o vídeo e processar as imagens
 def capturar_video():
-    global cap
+    global cap, frame_com_efeitos
     if cap is None:
         cap = cv2.VideoCapture(0)
     
     ret, frame = cap.read()
     if ret:
         # Aplicar os efeitos conforme ativados
+        frame_com_efeitos = frame.copy()
         if cinza_ativo:
-            frame = aplicar_cinza(frame)
+            frame_com_efeitos = aplicar_cinza(frame_com_efeitos)
         if desfoque_ativo:
-            frame = aplicar_desfoque(frame)
+            frame_com_efeitos = aplicar_desfoque(frame_com_efeitos)
         if sepia_ativo:
-            frame = aplicar_sepia(frame)
+            frame_com_efeitos = aplicar_sepia(frame_com_efeitos)
         if segmentacao_ativa:
-            frame, num_objetos = segmentar_e_contar(frame)
-            cv2.putText(frame, f"Objetos Detectados: {num_objetos}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            frame_com_efeitos, num_objetos = segmentar_e_contar(frame_com_efeitos)
+            cv2.putText(frame_com_efeitos, f"Objetos Detectados: {num_objetos}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+        if deteccao_ativa:
+            frame_com_efeitos = detectar_olhos_e_cara(frame_com_efeitos)
         
         # Converter a imagem BGR para RGB para exibir no Tkinter
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_rgb = cv2.cvtColor(frame_com_efeitos, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(frame_rgb)
         img = ImageTk.PhotoImage(img)
 
@@ -105,53 +123,35 @@ def ativar_segmentacao():
     global segmentacao_ativa
     segmentacao_ativa = not segmentacao_ativa
 
+def ativar_deteccao():
+    global deteccao_ativa
+    deteccao_ativa = not deteccao_ativa
+
 # Função para salvar a imagem
 def salvar_imagem():
     global frame_com_efeitos
     if frame_com_efeitos is not None:
-        # Permitir que o utilizador escolha o local e o nome do arquivo
-        caminho = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("Arquivos PNG", "*.png"), ("Todos os Arquivos", "*.*")])
-        if caminho:
-            cv2.imwrite(caminho, frame_com_efeitos)
-            print("Imagem salva com sucesso!")
+        desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop') if os.name == 'nt' else os.path.join(os.path.expanduser("~"), 'Desktop')
+        caminho = os.path.join(desktop, "imagem_salva.png")
+        cv2.imwrite(caminho, frame_com_efeitos)
+        print(f"Imagem salva com sucesso em: {caminho}")
 
 # Função para iniciar a câmera e mostrar os botões de efeitos
 def iniciar_camera():
-    # Carregar a imagem inicial "foto1.png"
-    img_inicial = Image.open("foto1.png")
-    img_inicial = ImageTk.PhotoImage(img_inicial)
-    
-    painel_imagem.configure(image=img_inicial)
-    painel_imagem.imgtk = img_inicial
-    
     # Esconder o botão de "Iniciar Câmera" e mostrar os botões de efeitos
     btn_iniciar_camera.pack_forget()
-    btn_cinza.pack(pady=10)
-    btn_sepia.pack(pady=10)
-    btn_desfoque.pack(pady=10)
-    btn_segmentacao.pack(pady=10)
-    btn_salvar.pack(pady=10)
+    frame_botoes.pack(pady=10)
+    
+    # Iniciar a captura de vídeo
+    capturar_video()
 
 # Criando a janela principal
 root = tk.Tk()
 root.title("Detecção de Face e Efeitos")
 
-# Estilo do tema
-style = ttk.Style()
-style.configure("TButton",
-                padding=6,
-                relief="flat",
-                background="#3e8e41",
-                foreground="white",
-                font=("Arial", 12))
-
 # Layout da janela
 root.geometry("1000x700")
 root.configure(bg="#333333")
-
-# Adicionando o painel para exibição da imagem inicial
-painel_imagem = tk.Label(root)
-painel_imagem.pack(pady=20)
 
 # Adicionando o painel para exibição do vídeo
 painel_video = tk.Label(root)
@@ -161,12 +161,25 @@ painel_video.pack(pady=20)
 btn_iniciar_camera = ttk.Button(root, text="Iniciar Câmera", command=iniciar_camera)
 btn_iniciar_camera.pack(pady=10)
 
+# Frame para organizar os botões de efeitos
+frame_botoes = tk.Frame(root, bg="#333333")
+frame_botoes.pack(pady=10)
+
 # Botões de efeitos
-btn_cinza = ttk.Button(root, text="Preto e Branco", command=ativar_cinza)
-btn_sepia = ttk.Button(root, text="Efeito Sepia", command=ativar_sepia)
-btn_desfoque = ttk.Button(root, text="Desfoque", command=ativar_desfoque)
-btn_segmentacao = ttk.Button(root, text="Segmentação", command=ativar_segmentacao)
-btn_salvar = ttk.Button(root, text="Salvar Imagem", command=salvar_imagem)
+btn_cinza = ttk.Button(frame_botoes, text="Preto e Branco", command=ativar_cinza)
+btn_sepia = ttk.Button(frame_botoes, text="Efeito Sepia", command=ativar_sepia)
+btn_desfoque = ttk.Button(frame_botoes, text="Desfoque", command=ativar_desfoque)
+btn_segmentacao = ttk.Button(frame_botoes, text="Segmentação", command=ativar_segmentacao)
+btn_deteccao = ttk.Button(frame_botoes, text="Identificar Olhos e Cara", command=ativar_deteccao)
+btn_salvar = ttk.Button(frame_botoes, text="Salvar Imagem", command=salvar_imagem)
+
+# Adicionar os botões ao frame
+btn_cinza.grid(row=0, column=0, padx=5, pady=5)
+btn_sepia.grid(row=0, column=1, padx=5, pady=5)
+btn_desfoque.grid(row=0, column=2, padx=5, pady=5)
+btn_segmentacao.grid(row=0, column=3, padx=5, pady=5)
+btn_deteccao.grid(row=0, column=4, padx=5, pady=5)
+btn_salvar.grid(row=0, column=5, padx=5, pady=5)
 
 # Variáveis globais
 cap = None
