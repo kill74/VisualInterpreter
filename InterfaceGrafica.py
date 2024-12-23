@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 import cv2
 from PIL import Image, ImageTk
 import numpy as np
@@ -105,6 +105,33 @@ def ativar_segmentacao():
     global segmentacao_ativa
     segmentacao_ativa = not segmentacao_ativa
 
+# Função para salvar a imagem
+def salvar_imagem():
+    global frame_com_efeitos
+    if frame_com_efeitos is not None:
+        # Permitir que o utilizador escolha o local e o nome do arquivo
+        caminho = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("Arquivos PNG", "*.png"), ("Todos os Arquivos", "*.*")])
+        if caminho:
+            cv2.imwrite(caminho, frame_com_efeitos)
+            print("Imagem salva com sucesso!")
+
+# Função para iniciar a câmera e mostrar os botões de efeitos
+def iniciar_camera():
+    # Carregar a imagem inicial "foto1.png"
+    img_inicial = Image.open("foto1.png")
+    img_inicial = ImageTk.PhotoImage(img_inicial)
+    
+    painel_imagem.configure(image=img_inicial)
+    painel_imagem.imgtk = img_inicial
+    
+    # Esconder o botão de "Iniciar Câmera" e mostrar os botões de efeitos
+    btn_iniciar_camera.pack_forget()
+    btn_cinza.pack(pady=10)
+    btn_sepia.pack(pady=10)
+    btn_desfoque.pack(pady=10)
+    btn_segmentacao.pack(pady=10)
+    btn_salvar.pack(pady=10)
+
 # Criando a janela principal
 root = tk.Tk()
 root.title("Detecção de Face e Efeitos")
@@ -122,31 +149,28 @@ style.configure("TButton",
 root.geometry("1000x700")
 root.configure(bg="#333333")
 
+# Adicionando o painel para exibição da imagem inicial
+painel_imagem = tk.Label(root)
+painel_imagem.pack(pady=20)
+
 # Adicionando o painel para exibição do vídeo
 painel_video = tk.Label(root)
 painel_video.pack(pady=20)
 
-# Adicionando botões
-btn_iniciar = ttk.Button(root, text="Iniciar Detecção", command=capturar_video)
-btn_iniciar.pack(pady=10)
+# Adicionando o botão "Iniciar Câmera"
+btn_iniciar_camera = ttk.Button(root, text="Iniciar Câmera", command=iniciar_camera)
+btn_iniciar_camera.pack(pady=10)
 
+# Botões de efeitos
 btn_cinza = ttk.Button(root, text="Preto e Branco", command=ativar_cinza)
-btn_cinza.pack(pady=10)
-
-btn_desfoque = ttk.Button(root, text="Desfoque", command=ativar_desfoque)
-btn_desfoque.pack(pady=10)
-
 btn_sepia = ttk.Button(root, text="Efeito Sepia", command=ativar_sepia)
-btn_sepia.pack(pady=10)
-
+btn_desfoque = ttk.Button(root, text="Desfoque", command=ativar_desfoque)
 btn_segmentacao = ttk.Button(root, text="Segmentação", command=ativar_segmentacao)
-btn_segmentacao.pack(pady=10)
-
-btn_fechar = ttk.Button(root, text="Fechar", command=fechar_janela)
-btn_fechar.pack(pady=10)
+btn_salvar = ttk.Button(root, text="Salvar Imagem", command=salvar_imagem)
 
 # Variáveis globais
 cap = None
+frame_com_efeitos = None
 
 # Iniciar o loop da interface gráfica
 root.mainloop()
