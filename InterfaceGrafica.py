@@ -1,16 +1,29 @@
 import sys
 import cv2
 import numpy as np
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                           QHBoxLayout, QPushButton, QLabel, QSlider, QFileDialog)
+from PyQt6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QSlider,
+    QFileDialog,
+    QCheckBox,
+)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
+import os
+
 
 class ProcessadorImagem(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Processador de Imagem OpenCV")
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QMainWindow {
                 background-color: #2b2b2b;
             }
@@ -29,6 +42,22 @@ class ProcessadorImagem(QMainWindow):
             QPushButton:hover {
                 background-color: #0b5ed7;
             }
+            QCheckBox {
+                color: white;
+                font-size: 12px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+            }
+            QCheckBox::indicator:unchecked {
+                border: 2px solid #4a4a4a;
+                background: #2b2b2b;
+            }
+            QCheckBox::indicator:checked {
+                background: #0d6efd;
+                border: 2px solid #0d6efd;
+            }
             QSlider {
                 background-color: transparent;
             }
@@ -44,15 +73,32 @@ class ProcessadorImagem(QMainWindow):
                 margin: -6px 0;
                 border-radius: 8px;
             }
-        """)
+        """
+        )
+
+        # Carrega os classificadores para detecção facial
+        cascade_path = "/usr/share/opencv4/haarcascades/"  # Path for Arch Linux
+        self.face_cascade = cv2.CascadeClassifier(
+            os.path.join(cascade_path, "haarcascade_frontalface_default.xml")
+        )
+        self.eye_cascade = cv2.CascadeClassifier(
+            os.path.join(cascade_path, "haarcascade_eye.xml")
+        )
 
         # Inicialização das variáveis
         self.capture = cv2.VideoCapture(0)
         self.current_frame = None
         self.processed_frame = None
         self.is_processing = True
-        self.current_filter = "original"
-        self.detect_objects = False  # Nova variável para controle de detecção
+
+        # Dicionário para controlar filtros ativos
+        self.active_filters = {
+            "gray": False,
+            "canny": False,
+            "blur": False,
+            "sepia": False,
+            "face_detection": False,
+        }
 
         # Configuração dos parâmetros de processamento
         self.blur_value = 1
@@ -61,21 +107,27 @@ class ProcessadorImagem(QMainWindow):
         self.canny_low = 100
         self.canny_high = 200
 
-        # Parâmetros para detecção de objetos
-        self.min_area = 5000  # Área mínima para considerar um objeto
-        self.max_area = 50000  # Área máxima para considerar um objeto
-
         # Configuração da interface
         self.setup_ui()
 
         # Timer para atualização do frame
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_frame)
-        self.timer.start(30)  # 30ms = ~33 FPS
+        self.timer.start(30)
+
+    def add_filter_checkbox(self, text, filter_name, layout):
+        """Adiciona uma checkbox para o filtro ao layout"""
+        checkbox = QCheckBox(text)
+        checkbox.stateChanged.connect(lambda state: self.toggle_filter(filter_name, state))
+        layout.addWidget(checkbox)
+        return checkbox
+
+    def toggle_filter(self, filter_name, state):
+        """Alterna o estado do filtro"""
+        self.active_filters[filter_name] = bool(state)
 
     def setup_ui(self):
         """Configura a interface gráfica principal"""
-        # Widget central
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QHBoxLayout(central_widget)
@@ -91,122 +143,144 @@ class ProcessadorImagem(QMainWindow):
         controls_layout = QVBoxLayout(controls_widget)
         controls_widget.setFixedWidth(200)
 
-        # Botões de filtros
-        self.add_filter_button("Original", "original", controls_layout)
-        self.add_filter_button("Escala de Cinza", "gray", controls_layout)
-        self.add_filter_button("Detecção de Bordas", "canny", controls_layout)
-        self.add_filter_button("Desfoque", "blur", controls_layout)
-        self.add_filter_button("Sépia", "sepia", controls_layout)
+        # Título da seção de filtros
+        filters_label = QLabel("Filtros Disponíveis:")
+        filters_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        controls_layout.addWidget(filters_label)
 
-        # Botão para detecção de objetos
-        self.detect_button = QPushButton("Detectar Objetos")
-        self.detect_button.setCheckable(True)  # Faz o botão alternável
-        self.detect_button.clicked.connect(self.toggle_detection)
-        controls_layout.addWidget(self.detect_button)
+        # Checkboxes para filtros
+        self.add_filter_checkbox("Escala de Cinza", "gray", controls_layout)
+        self.add_filter_checkbox("Detecção de Bordas", "canny", controls_layout)
+        self.add_filter_checkbox("Desfoque", "blur", controls_layout)
+        self.add_filter_checkbox("Sépia", "sepia", controls_layout)
+        self.add_filter_checkbox("Detectar Face/Olhos", "face_detection", controls_layout)
 
         # Sliders de controle
-        self.add_slider("Desfoque", 1, 21, self.blur_value, controls_layout)
-        self.add_slider("Brilho", -100, 100, self.brightness, controls_layout)
-        self.add_slider("Contraste", 0, 200, self.contrast, controls_layout)
+        self.blur_slider = self.add_slider("Desfoque", 1, 21, self.blur_value, controls_layout)
+        self.brightness_slider = self.add_slider("Brilho", -100, 100, self.brightness, controls_layout)
+        self.contrast_slider = self.add_slider("Contraste", 0, 200, self.contrast, controls_layout)
 
         # Botões de ação
         self.add_action_button("Capturar Imagem", self.capture_image, controls_layout)
         self.add_action_button("Salvar Imagem", self.save_image, controls_layout)
-        self.add_action_button("Contar Objetos", self.count_objects, controls_layout)
 
         layout.addWidget(controls_widget)
 
-    def toggle_detection(self):
-        """Alterna a detecção de objetos"""
-        self.detect_objects = self.detect_button.isChecked()
+    def detect_faces(self, frame):
+        """Detecta faces e olhos na imagem"""
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
 
-    def detect_common_objects(self, frame):
-        """Detecta objetos comuns como canetas e borrachas"""
-        # Converte para HSV para melhor segmentação
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        for (x, y, w, h) in faces:
+            # Desenha retângulo ao redor da face
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-        # Cria uma máscara para objetos escuros (possíveis canetas)
-        lower_dark = np.array([0, 0, 0])
-        upper_dark = np.array([180, 255, 50])
-        mask_dark = cv2.inRange(hsv, lower_dark, upper_dark)
+            # Região de interesse para os olhos
+            roi_gray = gray[y : y + h, x : x + w]
+            roi_color = frame[y : y + h, x : x + w]
 
-        # Cria uma máscara para objetos claros (possíveis borrachas)
-        lower_light = np.array([0, 0, 200])
-        upper_light = np.array([180, 30, 255])
-        mask_light = cv2.inRange(hsv, lower_light, upper_light)
+            # Detecta olhos na região da face
+            eyes = self.eye_cascade.detectMultiScale(roi_gray)
+            for (ex, ey, ew, eh) in eyes:
+                cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 255, 0), 2)
 
-        # Combina as máscaras
-        mask = cv2.bitwise_or(mask_dark, mask_light)
-
-        # Aplica operações morfológicas para remover ruído
-        kernel = np.ones((5,5), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-
-        # Encontra contornos
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        result = frame.copy()
-
-        # Analisa cada contorno
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if self.min_area < area < self.max_area:
-                # Calcula características do objeto
-                perimeter = cv2.arcLength(cnt, True)
-                approx = cv2.approxPolyDP(cnt, 0.02 * perimeter, True)
-
-                # Calcula a razão de aspecto
-                x, y, w, h = cv2.boundingRect(cnt)
-                aspect_ratio = float(w)/h
-
-                # Identifica o objeto baseado em suas características
-                if len(approx) > 6 and aspect_ratio > 3:
-                    object_type = "Caneta"
-                    color = (0, 255, 0)  # Verde para canetas
-                else:
-                    object_type = "Borracha"
-                    color = (0, 0, 255)  # Vermelho para borrachas
-
-                # Desenha o retângulo e o nome do objeto
-                cv2.rectangle(result, (x, y), (x + w, y + h), color, 2)
-                cv2.putText(result, object_type, (x, y - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-        return result
+        return frame
 
     def process_frame(self):
-        """Processa o frame atual com o filtro selecionado"""
+        """Processa o frame atual com os filtros selecionados"""
         if self.current_frame is None:
             return
 
+        # Começa com o frame original
         self.processed_frame = self.current_frame.copy()
 
-        # Primeiro aplica os filtros normais
-        if self.current_filter == "gray":
+        # Aplica cada filtro ativo em sequência
+        if self.active_filters["gray"]:
             self.processed_frame = cv2.cvtColor(self.processed_frame, cv2.COLOR_BGR2GRAY)
             self.processed_frame = cv2.cvtColor(self.processed_frame, cv2.COLOR_GRAY2BGR)
-        elif self.current_filter == "canny":
-            gray = cv2.cvtColor(self.processed_frame, cv2.COLOR_BGR2GRAY)
-            self.processed_frame = cv2.Canny(gray, self.canny_low, self.canny_high)
-            self.processed_frame = cv2.cvtColor(self.processed_frame, cv2.COLOR_GRAY2BGR)
-        elif self.current_filter == "blur":
-            k_size = self.blur_value * 2 + 1
+
+        if self.active_filters["blur"]:
+            k_size = self.blur_slider.value() * 2 + 1
             self.processed_frame = cv2.GaussianBlur(self.processed_frame, (k_size, k_size), 0)
-        elif self.current_filter == "sepia":
+
+        if self.active_filters["canny"]:
+            gray = cv2.cvtColor(self.processed_frame, cv2.COLOR_BGR2GRAY)
+            edges = cv2.Canny(gray, self.canny_low, self.canny_high)
+            self.processed_frame = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+
+        if self.active_filters["sepia"]:
             self.processed_frame = self.apply_sepia()
 
-        # Depois aplica a detecção de objetos se estiver ativada
-        if self.detect_objects:
-            self.processed_frame = self.detect_common_objects(self.processed_frame)
+        if self.active_filters["face_detection"]:
+            self.processed_frame = self.detect_faces(self.processed_frame)
 
-    # [Resto do código permanece o mesmo...]
+    def apply_sepia(self):
+        """Aplica o efeito sépia à imagem"""
+        kernel = np.array(
+            [
+                [0.272, 0.534, 0.131],
+                [0.349, 0.686, 0.168],
+                [0.393, 0.769, 0.189],
+            ]
+        )
+        return cv2.transform(self.processed_frame, kernel)
+
+    def update_frame(self):
+        """Atualiza o frame do vídeo"""
+        ret, frame = self.capture.read()
+        if ret:
+            self.current_frame = cv2.flip(frame, 1)
+            self.process_frame()
+            self.display_frame()
+
+    def display_frame(self):
+        """Exibe o frame processado na interface"""
+        if self.processed_frame is not None:
+            frame = cv2.cvtColor(self.processed_frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = frame.shape
+            bytes_per_line = ch * w
+            qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            self.video_label.setPixmap(QPixmap.fromImage(qt_image).scaled(
+                self.video_label.size(), Qt.AspectRatioMode.KeepAspectRatio
+            ))
+
+    def add_slider(self, name, min_val, max_val, default_val, layout):
+        """Adiciona um slider de controle ao layout"""
+        label = QLabel(name)
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setMinimum(min_val)
+        slider.setMaximum(max_val)
+        slider.setValue(default_val)
+        layout.addWidget(label)
+        layout.addWidget(slider)
+        return slider
+
+    def add_action_button(self, text, function, layout):
+        """Adiciona um botão de ação ao layout"""
+        button = QPushButton(text)
+        button.clicked.connect(function)
+        layout.addWidget(button)
+
+    def capture_image(self):
+        """Captura o frame atual"""
+        if self.processed_frame is not None:
+            self.captured_frame = self.processed_frame.copy()
+
+    def save_image(self):
+        """Salva a imagem processada"""
+        if self.processed_frame is not None:
+            filename, _ = QFileDialog.getSaveFileName(
+                self, "Salvar Imagem", "", "Imagens (*.png *.jpg *.jpeg)"
+            )
+            if filename:
+                cv2.imwrite(filename, self.processed_frame)
 
     def closeEvent(self, event):
         """Método chamado quando a janela é fechada"""
         self.capture.release()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = ProcessadorImagem()
     window.show()
