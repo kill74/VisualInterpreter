@@ -21,7 +21,7 @@ import os
 class ProcessadorImagem(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Processador de Imagem OpenCV")
+        self.setWindowTitle("Trabalho AI - Processador de Imagens")
         self.setStyleSheet(
             """
             QMainWindow {
