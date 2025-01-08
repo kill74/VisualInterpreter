@@ -134,14 +134,14 @@ class ProcessadorImagem(QMainWindow):
 
         # Área de exibição do vídeo
         self.video_label = QLabel()
-        self.video_label.setMinimumSize(640, 480)
+        self.video_label.setMinimumSize(800, 600)
         self.video_label.setStyleSheet("border: 2px solid #4a4a4a;")
         layout.addWidget(self.video_label)
 
         # Painel de controles
         controls_widget = QWidget()
         controls_layout = QVBoxLayout(controls_widget)
-        controls_widget.setFixedWidth(200)
+        controls_widget.setFixedWidth(400)
 
         # Título da seção de filtros
         filters_label = QLabel("Filtros Disponíveis:")
