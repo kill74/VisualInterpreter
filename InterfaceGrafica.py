@@ -32,7 +32,7 @@ class ProcessadorImagem(QMainWindow):
                 font-size: 12px;
             }
             QPushButton {
-                background-color: #0d6efd;
+                background-color: #800000;
                 color: white;
                 border: none;
                 padding: 8px 16px;
@@ -55,7 +55,7 @@ class ProcessadorImagem(QMainWindow):
                 background: #2b2b2b;
             }
             QCheckBox::indicator:checked {
-                background: #0d6efd;
+                background: #800000;
                 border: 2px solid #0d6efd;
             }
             QSlider {
@@ -67,7 +67,7 @@ class ProcessadorImagem(QMainWindow):
                 border-radius: 2px;
             }
             QSlider::handle:horizontal {
-                background: #0d6efd;
+                background: #800000;
                 width: 16px;
                 height: 16px;
                 margin: -6px 0;
